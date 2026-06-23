@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Rocket, 
-  Sparkles, 
-  Search, 
-  AlertCircle, 
-  Briefcase, 
-  Building2, 
+import {
+  Rocket,
+  Sparkles,
+  Search,
+  AlertCircle,
+  Briefcase,
+  Building2,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -23,9 +23,9 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import { 
-  fetchJobs, 
-  evaluateJobWithAI, 
+import {
+  fetchJobs,
+  evaluateJobWithAI,
   addJob,
   generateContacto,
   generateCover,
@@ -57,7 +57,7 @@ export default function Dashboard() {
   const [chatInput, setChatInput] = useState('');
   const [chatResult, setChatResult] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
-  
+
   // Custom URL Overrides State
   const [chosenRecruiterUrl, setChosenRecruiterUrl] = useState('');
   const [chosenManagerUrl, setChosenManagerUrl] = useState('');
@@ -66,7 +66,7 @@ export default function Dashboard() {
   const [contactoData, setContactoData] = useState({ outreachDetails: '', resumeProfile: 'sde' });
   const [contactoResult, setContactoResult] = useState(null);
   const [isContactoLoading, setIsContactoLoading] = useState(false);
-  
+
   const [deepData, setDeepData] = useState({ company: '' });
   const [deepResult, setDeepResult] = useState(null);
   const [isDeepLoading, setIsDeepLoading] = useState(false);
@@ -108,7 +108,7 @@ export default function Dashboard() {
   const handleAIEvaluate = async (e) => {
     e.preventDefault();
     if (!aiUrl) return;
-    
+
     setIsEvaluating(true);
     setError(null);
     setEvaluationResult(null);
@@ -120,7 +120,7 @@ export default function Dashboard() {
     try {
       const res = await evaluateJobWithAI(aiUrl, aiText, resumeProfile, selectedModel);
       setEvaluationResult(res);
-      
+
       // Auto-save the evaluated job to the tracker with raw JSON
       if (res && res.data) {
         res.data['Raw_Report_JSON'] = JSON.stringify(res.report);
@@ -137,20 +137,20 @@ export default function Dashboard() {
   const handleApplyToTracker = async () => {
     if (!evaluationResult || !evaluationResult.data) return;
     try {
-      const jobData = { 
-        ...evaluationResult.data, 
+      const jobData = {
+        ...evaluationResult.data,
         Status: 'Applied',
         'Date Applied': evaluationResult.data['Date Applied'] || new Date().toISOString().split('T')[0]
       };
-      
+
       if (contactsResult) {
         jobData['Recruiter URL'] = contactsResult.recruiterUrl;
         jobData['Hiring Manager URL'] = contactsResult.managerUrl;
       }
-      
+
       if (chosenRecruiterUrl) jobData['Chosen Recruiter URL'] = chosenRecruiterUrl;
       if (chosenManagerUrl) jobData['Chosen Manager URL'] = chosenManagerUrl;
-      
+
       await addJob(jobData);
       setEvaluationResult(null);
       setContactsResult(null);
@@ -167,13 +167,13 @@ export default function Dashboard() {
     setError(null);
     try {
       const res = await generateEmails(aiUrl, aiText, resumeProfile, selectedModel);
-      
+
       const updatedReport = {
         ...evaluationResult.report,
         recruiter_email: res.recruiter_email,
         manager_email: res.manager_email
       };
-      
+
       const updatedData = {
         ...evaluationResult.data,
         Raw_Report_JSON: JSON.stringify(updatedReport)
@@ -183,7 +183,7 @@ export default function Dashboard() {
         data: updatedData,
         report: updatedReport
       });
-      
+
       // Auto-save the newly generated emails back      // Auto-save
       await addJob(updatedData);
       await loadJobs();
@@ -229,11 +229,11 @@ export default function Dashboard() {
   const handleStatusChange = async (e, job) => {
     e.stopPropagation();
     const newStatus = e.target.value;
-    
+
     // Optimistic update
-    const updatedJobs = jobs.map(j => 
-      j['Job Link'] === job['Job Link'] && j['Resume Profile'] === job['Resume Profile'] 
-        ? { ...j, Status: newStatus } 
+    const updatedJobs = jobs.map(j =>
+      j['Job Link'] === job['Job Link'] && j['Resume Profile'] === job['Resume Profile']
+        ? { ...j, Status: newStatus }
         : j
     );
     setJobs(updatedJobs);
@@ -331,25 +331,25 @@ export default function Dashboard() {
           <h2>Career Ops</h2>
         </div>
         <nav className="sidebar-nav">
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'tracker' ? 'active' : ''}`}
             onClick={() => setActiveTab('tracker')}
           >
             <LayoutDashboard size={18} /> Application Tracker
           </button>
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'evaluator' ? 'active' : ''}`}
             onClick={() => setActiveTab('evaluator')}
           >
             <Target size={18} /> Job Evaluator
           </button>
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'outreach' ? 'active' : ''}`}
             onClick={() => setActiveTab('outreach')}
           >
             <MessageSquare size={18} /> Outreach & Research
           </button>
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'documents' ? 'active' : ''}`}
             onClick={() => setActiveTab('documents')}
           >
@@ -362,10 +362,10 @@ export default function Dashboard() {
       <main className="main-content">
         <div className="top-bar" style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem 2rem', borderBottom: '1px solid #e2e8f0', backgroundColor: 'white', marginBottom: '2rem', sticky: 'top', zIndex: 10 }}>
           <div className="model-selector" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <label htmlFor="model-select" style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Gemini Model:</label>
-            <select 
+            <label htmlFor="model-select" style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>Gen AI Model:</label>
+            <select
               id="model-select"
-              value={selectedModel} 
+              value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontSize: '0.875rem', outline: 'none', cursor: 'pointer', fontWeight: 500 }}
             >
@@ -400,7 +400,7 @@ export default function Dashboard() {
               <h1>Dashboard Overview</h1>
               <p>Monitor your active applications and overall pipeline health.</p>
             </div>
-            
+
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-icon-wrapper blue"><Briefcase size={24} /></div>
@@ -478,7 +478,7 @@ export default function Dashboard() {
                           </td>
                           <td className="text-muted">{job['Job ID'] || '-'}</td>
                           <td>
-                            <select 
+                            <select
                               value={job.Status || 'Evaluated'}
                               onChange={(e) => handleStatusChange(e, job)}
                               onClick={(e) => e.stopPropagation()}
@@ -533,7 +533,7 @@ export default function Dashboard() {
         {/* --- EVALUATOR TAB --- */}
         {activeTab === 'evaluator' && (
           <div className="tab-pane fade-in">
-             <div className="tab-header">
+            <div className="tab-header">
               <h1>AI Job Evaluator</h1>
               <p>Analyze job postings, uncover recruiter details, and decide if you want to apply.</p>
             </div>
@@ -557,7 +557,7 @@ export default function Dashboard() {
                     </div>
                     <div className="form-group">
                       <label>Raw Job Description (Optional)</label>
-                      <textarea 
+                      <textarea
                         rows="3"
                         placeholder="Paste text here if the job requires a login..."
                         value={aiText}
@@ -565,11 +565,11 @@ export default function Dashboard() {
                       ></textarea>
                     </div>
                   </div>
-                  
+
                   <div className="eval-col-side">
                     <div className="form-group">
                       <label>Target Profile</label>
-                      <select 
+                      <select
                         value={resumeProfile}
                         onChange={(e) => setResumeProfile(e.target.value)}
                       >
@@ -581,7 +581,7 @@ export default function Dashboard() {
                       </select>
                       <p className="help-text">Select which CV profile you want to compare against this job.</p>
                     </div>
-                    
+
                     <button type="submit" className="eval-submit-btn" disabled={isEvaluating}>
                       {isEvaluating ? <><Loader2 size={20} className="spinner" /> Analyzing Match...</> : <><Sparkles size={20} /> Run Evaluation</>}
                     </button>
@@ -604,7 +604,7 @@ export default function Dashboard() {
                 </div>
 
                 <p className="report-summary">{evaluationResult.report.evaluation_summary}</p>
-                
+
                 <div className="report-grid">
                   <div className="report-box pros">
                     <h4><CheckCircle2 size={16} /> Key Pros</h4>
@@ -623,12 +623,12 @@ export default function Dashboard() {
                 <div className="chat-box" style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
                   <h4 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><MessageSquare size={18} /> Application Q&A Chat</h4>
                   <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                    <textarea 
-                      placeholder="e.g. Help me answer 'Why do you want to join us?' based on my CV..." 
-                      className="url-input" 
+                    <textarea
+                      placeholder="e.g. Help me answer 'Why do you want to join us?' based on my CV..."
+                      className="url-input"
                       style={{ flex: 1, padding: '0.75rem 1rem', resize: 'vertical', minHeight: '80px', fontFamily: 'inherit' }}
-                      value={chatInput} 
-                      onChange={(e) => setChatInput(e.target.value)} 
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -636,9 +636,9 @@ export default function Dashboard() {
                         }
                       }}
                     />
-                    <button 
-                      onClick={handleAskChat} 
-                      className="eval-submit-btn" 
+                    <button
+                      onClick={handleAskChat}
+                      className="eval-submit-btn"
                       disabled={isChatLoading || !chatInput.trim()}
                       style={{ width: 'auto', padding: '0.5rem 1.5rem', fontSize: '0.9rem', backgroundColor: '#3b82f6', alignSelf: 'flex-start' }}
                     >
@@ -656,9 +656,9 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h4 style={{ margin: 0 }}>Identified Contacts</h4>
                     {!contactsResult && (
-                      <button 
-                        onClick={handleFindContacts} 
-                        className="eval-submit-btn" 
+                      <button
+                        onClick={handleFindContacts}
+                        className="eval-submit-btn"
                         disabled={isFindingContacts}
                         style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
                       >
@@ -671,32 +671,32 @@ export default function Dashboard() {
                     <>
                       <div className="contact-row mb-4">
                         <p><strong>Recruiter Search:</strong> {
-                          contactsResult.recruiterUrl?.startsWith('http') 
-                            ? <a href={contactsResult.recruiterUrl} target="_blank" rel="noreferrer">LinkedIn Search</a> 
+                          contactsResult.recruiterUrl?.startsWith('http')
+                            ? <a href={contactsResult.recruiterUrl} target="_blank" rel="noreferrer">LinkedIn Search</a>
                             : (contactsResult.recruiterUrl || 'Not found')
                         }</p>
-                        <input 
-                          type="url" 
-                          placeholder="Paste chosen Recruiter LinkedIn URL here" 
-                          className="url-input" 
+                        <input
+                          type="url"
+                          placeholder="Paste chosen Recruiter LinkedIn URL here"
+                          className="url-input"
                           style={{ marginTop: '0.5rem', padding: '0.5rem 1rem' }}
-                          value={chosenRecruiterUrl} 
-                          onChange={(e) => setChosenRecruiterUrl(e.target.value)} 
+                          value={chosenRecruiterUrl}
+                          onChange={(e) => setChosenRecruiterUrl(e.target.value)}
                         />
                       </div>
                       <div className="contact-row">
                         <p><strong>Hiring Manager Search:</strong> {
-                          contactsResult.managerUrl?.startsWith('http') 
-                            ? <a href={contactsResult.managerUrl} target="_blank" rel="noreferrer">LinkedIn Search</a> 
+                          contactsResult.managerUrl?.startsWith('http')
+                            ? <a href={contactsResult.managerUrl} target="_blank" rel="noreferrer">LinkedIn Search</a>
                             : (contactsResult.managerUrl || 'Not found')
                         }</p>
-                        <input 
-                          type="url" 
-                          placeholder="Paste chosen Manager LinkedIn URL here" 
-                          className="url-input" 
+                        <input
+                          type="url"
+                          placeholder="Paste chosen Manager LinkedIn URL here"
+                          className="url-input"
                           style={{ marginTop: '0.5rem', padding: '0.5rem 1rem' }}
-                          value={chosenManagerUrl} 
-                          onChange={(e) => setChosenManagerUrl(e.target.value)} 
+                          value={chosenManagerUrl}
+                          onChange={(e) => setChosenManagerUrl(e.target.value)}
                         />
                       </div>
                       <div className="contact-row mt-4" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px dashed #cbd5e1' }}>
@@ -710,16 +710,16 @@ export default function Dashboard() {
                 <div className="emails-section">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h4 style={{ margin: 0 }}>{evaluationResult.report.recruiter_email || evaluationResult.report.manager_email ? 'Generated Cold Emails' : ''}</h4>
-                    <button 
-                      onClick={handleGenerateEmails} 
-                      className="eval-submit-btn" 
+                    <button
+                      onClick={handleGenerateEmails}
+                      className="eval-submit-btn"
                       style={{ backgroundColor: '#8b5cf6', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
                       disabled={isGeneratingEmails}
                     >
                       {isGeneratingEmails ? <><Loader2 size={16} className="spinner" /> Generating...</> : <><MessageSquare size={16} /> {evaluationResult.report.recruiter_email ? 'Regenerate Emails' : 'Generate Cold Emails'}</>}
                     </button>
                   </div>
-                  
+
                   {(evaluationResult.report.recruiter_email || evaluationResult.report.manager_email) && (
                     <div className="report-grid">
                       {evaluationResult.report.recruiter_email && (
@@ -729,7 +729,7 @@ export default function Dashboard() {
                             <button onClick={() => copyRichText('recruiter-email-content')} className="copy-btn">Copy</button>
                           </div>
                           <div id="recruiter-email-content" className="email-markdown">
-                            <ReactMarkdown components={{ p: ({node, ...props}) => <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5em' }} {...props} /> }}>
+                            <ReactMarkdown components={{ p: ({ node, ...props }) => <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5em' }} {...props} /> }}>
                               {evaluationResult.report.recruiter_email}
                             </ReactMarkdown>
                           </div>
@@ -742,7 +742,7 @@ export default function Dashboard() {
                             <button onClick={() => copyRichText('manager-email-content')} className="copy-btn">Copy</button>
                           </div>
                           <div id="manager-email-content" className="email-markdown">
-                            <ReactMarkdown components={{ p: ({node, ...props}) => <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5em' }} {...props} /> }}>
+                            <ReactMarkdown components={{ p: ({ node, ...props }) => <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5em' }} {...props} /> }}>
                               {evaluationResult.report.manager_email}
                             </ReactMarkdown>
                           </div>
@@ -779,14 +779,14 @@ export default function Dashboard() {
                 <h2><Send size={20} className="icon-blue" /> Outreach Generator</h2>
                 <p className="text-muted text-sm mb-4">Generate targeted connection requests and emails.</p>
                 <form onSubmit={handleContactoSubmit} className="stacked-form">
-                  <textarea 
-                    placeholder="Enter details: e.g. Contacting John at Google for the Frontend role. Mention my open source work." 
-                    required 
-                    value={contactoData.outreachDetails} 
-                    onChange={e => setContactoData({...contactoData, outreachDetails: e.target.value})}
+                  <textarea
+                    placeholder="Enter details: e.g. Contacting John at Google for the Frontend role. Mention my open source work."
+                    required
+                    value={contactoData.outreachDetails}
+                    onChange={e => setContactoData({ ...contactoData, outreachDetails: e.target.value })}
                     style={{ minHeight: '120px', resize: 'vertical', padding: '0.75rem', fontFamily: 'inherit', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
                   />
-                  <select value={contactoData.resumeProfile} onChange={e => setContactoData({...contactoData, resumeProfile: e.target.value})}>
+                  <select value={contactoData.resumeProfile} onChange={e => setContactoData({ ...contactoData, resumeProfile: e.target.value })}>
                     <option value="sde">Software Engineer (SDE)</option>
                     <option value="cloud-devops">Cloud / DevOps</option>
                     <option value="cybersec">Cybersecurity</option>
@@ -809,11 +809,11 @@ export default function Dashboard() {
                 <h2><BookOpen size={20} className="icon-purple" /> Deep Company Research</h2>
                 <p className="text-muted text-sm mb-4">Get a comprehensive company brief.</p>
                 <form onSubmit={handleDeepSubmit} className="stacked-form">
-                  <textarea 
-                    placeholder="Company Name or detailed research request..." 
-                    required 
-                    value={deepData.company} 
-                    onChange={e => setDeepData({...deepData, company: e.target.value})}
+                  <textarea
+                    placeholder="Company Name or detailed research request..."
+                    required
+                    value={deepData.company}
+                    onChange={e => setDeepData({ ...deepData, company: e.target.value })}
                     style={{ minHeight: '80px', resize: 'vertical', padding: '0.75rem', fontFamily: 'inherit', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
                   />
                   <button type="submit" disabled={isDeepLoading} className="secondary-btn">
@@ -844,16 +844,16 @@ export default function Dashboard() {
                 <h2><FileText size={20} className="icon-green" /> Resume Tailoring</h2>
                 <p className="text-muted text-sm mb-4">Generate an ATS-optimized CV PDF.</p>
                 <form onSubmit={handlePdfSubmit} className="stacked-form">
-                  <input type="url" placeholder="Paste Job Description URL" required value={pdfData.jobUrl} onChange={e => setPdfData({...pdfData, jobUrl: e.target.value})} />
-                  <textarea rows="3" placeholder="Or paste raw Job Description (optional)" value={pdfData.jobText} onChange={e => setPdfData({...pdfData, jobText: e.target.value})}></textarea>
-                  <select value={pdfData.resumeProfile} onChange={e => setPdfData({...pdfData, resumeProfile: e.target.value})}>
+                  <input type="url" placeholder="Paste Job Description URL" required value={pdfData.jobUrl} onChange={e => setPdfData({ ...pdfData, jobUrl: e.target.value })} />
+                  <textarea rows="3" placeholder="Or paste raw Job Description (optional)" value={pdfData.jobText} onChange={e => setPdfData({ ...pdfData, jobText: e.target.value })}></textarea>
+                  <select value={pdfData.resumeProfile} onChange={e => setPdfData({ ...pdfData, resumeProfile: e.target.value })}>
                     <option value="sde">Software Engineer (SDE)</option>
                     <option value="cloud-devops">Cloud / DevOps</option>
                     <option value="cybersec">Cybersecurity</option>
                     <option value="ai">AI / ML</option>
                     <option value="systems">Systems Software</option>
                   </select>
-                  <select value={pdfData.format} onChange={e => setPdfData({...pdfData, format: e.target.value})}>
+                  <select value={pdfData.format} onChange={e => setPdfData({ ...pdfData, format: e.target.value })}>
                     <option value="letter">US Letter (Americas)</option>
                     <option value="a4">A4 (Rest of World)</option>
                   </select>
@@ -878,9 +878,9 @@ export default function Dashboard() {
                 <h2><FileText size={20} className="icon-orange" /> Cover Letter Generator</h2>
                 <p className="text-muted text-sm mb-4">Generate a 1-page custom cover letter.</p>
                 <form onSubmit={handleCoverSubmit} className="stacked-form">
-                  <input type="url" placeholder="Paste Job Description URL" required value={coverData.jobUrl} onChange={e => setCoverData({...coverData, jobUrl: e.target.value})} />
-                  <textarea rows="3" placeholder="Or paste raw Job Description (optional)" value={coverData.jobText} onChange={e => setCoverData({...coverData, jobText: e.target.value})}></textarea>
-                  <select value={coverData.resumeProfile} onChange={e => setCoverData({...coverData, resumeProfile: e.target.value})}>
+                  <input type="url" placeholder="Paste Job Description URL" required value={coverData.jobUrl} onChange={e => setCoverData({ ...coverData, jobUrl: e.target.value })} />
+                  <textarea rows="3" placeholder="Or paste raw Job Description (optional)" value={coverData.jobText} onChange={e => setCoverData({ ...coverData, jobText: e.target.value })}></textarea>
+                  <select value={coverData.resumeProfile} onChange={e => setCoverData({ ...coverData, resumeProfile: e.target.value })}>
                     <option value="sde">Software Engineer (SDE)</option>
                     <option value="cloud-devops">Cloud / DevOps</option>
                     <option value="cybersec">Cybersecurity</option>
