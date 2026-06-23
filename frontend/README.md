@@ -1,16 +1,30 @@
-# React + Vite
+# Career Ops - Frontend Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The frontend component of the Career Ops ecosystem. It is a modern React application built with Vite that provides a sleek interface for evaluating job postings, tracking applications, and generating cold emails.
 
-Currently, two official plugins are available:
+## Tech Stack
+- **React 18**
+- **Vite**
+- **Vanilla CSS** (Responsive layout with dark mode hints)
+- **Lucide React** (Icons)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Setup & Running Locally
 
-## React Compiler
+1. Install dependencies:
+```bash
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+2. Start the development server:
+```bash
+npm run dev
+```
 
-## Expanding the ESLint configuration
+The app will start on `http://localhost:5173`. 
+*Note: The frontend requires the `server` to be running concurrently on `http://localhost:3000` to function properly.*
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Features
+- **Job Evaluator:** Paste a URL to scrape and evaluate using Gemini AI.
+- **Application Tracker:** Visual spreadsheet showing your Excel DB contents.
+- **Cold Email Generator:** Formats recruiter and manager emails based on your custom `config/emails.json` templates, with smart preservation of UI formatting and clickable links.
+- **Auto-Caching:** Automatically preserves raw scraped job descriptions to prevent repeated network calls to job boards.

@@ -35,7 +35,7 @@ app.use(express.json());
 app.use('/output', express.static(path.join(__dirname, '..', 'output')));
 
 // Default column headers
-const DEFAULT_HEADERS = ['Company', 'Job Role', 'Job ID', 'Job Link', 'Status', 'Score', 'Resume Profile', 'Date Applied', 'Recruiter URL', 'Hiring Manager URL'];
+const DEFAULT_HEADERS = ['Company', 'Job Role', 'Job ID', 'Job Link', 'Status', 'Score', 'Resume Profile', 'Date Applied', 'Recruiter URL', 'Hiring Manager URL', 'Job Description'];
 
 const Groq = require('groq-sdk');
 
@@ -284,17 +284,26 @@ ${scrapedText.slice(0, 4000)}
 Using the provided COLD EMAIL TEMPLATES & RESUME POINTS:
 1. Select the most relevant resume point from "recruiter_resume_points" for the Recruiter email, and the most relevant from "manager_resume_points" for the Hiring Manager email.
 2. Fill in the "recruiter_template" and "manager_template" by replacing [Req#], [Role Name] / [Role], [Req ID], [Company] / [Company Name], [domain], and your chosen [resume point] with appropriate values from the job posting and the selected resume point. Leave [Name] as is.
-3. Return a JSON object with exactly these keys:
-{
-  "recruiter_email": "Generated email for the recruiter",
-  "manager_email": "Generated email for the hiring manager"
-}
-Return ONLY the JSON object, no markdown.`;
+3. Return the generated emails using EXACTLY the following XML delimiters. Do not use JSON.
+
+<RECRUITER_EMAIL>
+Put the generated recruiter email here...
+</RECRUITER_EMAIL>
+
+<MANAGER_EMAIL>
+Put the generated manager email here...
+</MANAGER_EMAIL>`;
 
     try {
         const responseText = await generateAIContent(prompt, requestModel, 0.4, 4096);
-        const jsonStr = responseText.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
-        return JSON.parse(jsonStr);
+        
+        const recruiterMatch = responseText.match(/<RECRUITER_EMAIL>([\s\S]*?)<\/RECRUITER_EMAIL>/i);
+        const managerMatch = responseText.match(/<MANAGER_EMAIL>([\s\S]*?)<\/MANAGER_EMAIL>/i);
+        
+        return {
+            recruiter_email: recruiterMatch ? recruiterMatch[1].trim() : "",
+            manager_email: managerMatch ? managerMatch[1].trim() : ""
+        };
     } catch (error) {
         console.error('Email generation parse error:', error.message);
         throw error;
@@ -636,7 +645,8 @@ app.post('/api/jobs/evaluate', async (req, res) => {
             'Job Link': url,
             'Job ID': jobMetadata.req_id,
             'Recruiter URL': '',
-            'Hiring Manager URL': ''
+            'Hiring Manager URL': '',
+            'Job Description': scrapedText
         };
         
         const evaluationReport = {
@@ -675,7 +685,7 @@ app.post('/api/jobs/contacts', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing company name' });
         }
         
-        console.log(`🔎 Generating LinkedIn search URLs for ${company}...`);
+        console.log(`\n🔎 Fetching contact data and predicting email format for ${company}...`);
         
         const recruiterQuery = `${company} AND ("Technical Recruiter" OR "Talent Acquisition" OR "Recruiting" OR "university recruiter")`;
         const managerQuery = `${company} AND ("Engineering Manager" OR "Software Engineering Manager" OR "Director of Software Engineering")`;

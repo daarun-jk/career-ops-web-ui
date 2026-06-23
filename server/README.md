@@ -254,7 +254,8 @@ curl -X POST http://localhost:3000/api/jobs/evaluate \
     "Notes": "Auto-evaluated from posting",
     "ReqID": "REQ-2024-5678",
     "RecruiterName": "John Smith",
-    "HiringManager": "Jane Doe"
+    "HiringManager": "Jane Doe",
+    "Job Description": "Full raw text of the scraped job posting..."
   }
 }
 ```
@@ -531,6 +532,7 @@ The server automatically creates an `applications.xlsx` file with the following 
 | ReqID | String | Requisition ID (auto-filled by /evaluate) |
 | RecruiterName | String | Recruiter name (auto-filled by /evaluate) |
 | HiringManager | String | Hiring manager name (auto-filled by /evaluate) |
+| Job Description | String | Raw scraped text of the job posting (auto-filled by /evaluate) |
 
 ## Frontend Integration Example
 

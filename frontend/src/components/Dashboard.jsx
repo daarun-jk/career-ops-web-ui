@@ -40,6 +40,7 @@ import './Dashboard.css';
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('tracker');
   const [jobs, setJobs] = useState([]);
+  const [trackerSearch, setTrackerSearch] = useState('');
   const [error, setError] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState('gemini-flash-latest');
@@ -105,6 +106,28 @@ export default function Dashboard() {
     sel.removeAllRanges();
   };
 
+  const parseEmail = (emailText) => {
+    if (!emailText) return { subject: '', body: '' };
+    const lines = emailText.split('\n');
+    let subject = '';
+    let bodyStartIndex = 0;
+
+    if (lines[0].trim().startsWith('Subject:')) {
+      subject = lines[0].replace('Subject:', '').trim();
+      bodyStartIndex = 1;
+    } else if (lines[0].trim().startsWith('**Subject:**')) {
+      subject = lines[0].replace('**Subject:**', '').trim();
+      bodyStartIndex = 1;
+    }
+
+    while (bodyStartIndex < lines.length && !lines[bodyStartIndex].trim()) {
+      bodyStartIndex++;
+    }
+
+    const body = lines.slice(bodyStartIndex).join('\n').trim();
+    return { subject, body };
+  };
+
   const handleAIEvaluate = async (e) => {
     e.preventDefault();
     if (!aiUrl) return;
@@ -120,6 +143,10 @@ export default function Dashboard() {
     try {
       const res = await evaluateJobWithAI(aiUrl, aiText, resumeProfile, selectedModel);
       setEvaluationResult(res);
+
+      if (res?.data?.['Job Description']) {
+        setAiText(res.data['Job Description']);
+      }
 
       // Auto-save the evaluated job to the tracker with raw JSON
       if (res && res.data) {
@@ -166,7 +193,27 @@ export default function Dashboard() {
     setIsGeneratingEmails(true);
     setError(null);
     try {
+      // If we don't have the email format yet, fetch it concurrently
+      let emailFormatPromise = null;
+      if (!contactsResult?.emailFormat && evaluationResult.data.Company) {
+         emailFormatPromise = findContacts(evaluationResult.data.Company, aiUrl, aiText, selectedModel);
+      }
+
       const res = await generateEmails(aiUrl, aiText, resumeProfile, selectedModel);
+
+      if (emailFormatPromise) {
+         try {
+           const contactRes = await emailFormatPromise;
+           setContactsResult(prev => ({
+             ...prev,
+             emailFormat: contactRes.emailFormat,
+             recruiterUrl: prev?.recruiterUrl || contactRes.recruiterUrl,
+             managerUrl: prev?.managerUrl || contactRes.managerUrl
+           }));
+         } catch (e) {
+           console.error("Failed to fetch email format during email generation", e);
+         }
+      }
 
       const updatedReport = {
         ...evaluationResult.report,
@@ -200,11 +247,12 @@ export default function Dashboard() {
     setError(null);
     try {
       const res = await findContacts(evaluationResult.data.Company, aiUrl, aiText, selectedModel);
-      setContactsResult({
+      setContactsResult(prev => ({
+        ...prev,
         recruiterUrl: res.recruiterUrl,
         managerUrl: res.managerUrl,
-        emailFormat: res.emailFormat
-      });
+        emailFormat: prev?.emailFormat || '' // Do not update emailFormat here, save it for Generate Cold Emails
+      }));
     } catch (err) {
       setError('Failed to find contacts: ' + err.message);
     } finally {
@@ -253,9 +301,22 @@ export default function Dashboard() {
         const report = JSON.parse(job.Raw_Report_JSON);
         setEvaluationResult({ data: job, report });
         setAiUrl(job['Job Link'] || '');
+        setAiText(job['Job Description'] || '');
         setResumeProfile(job['Resume Profile'] || 'sde');
         setChosenRecruiterUrl(job['Chosen Recruiter URL'] || '');
         setChosenManagerUrl(job['Chosen Manager URL'] || '');
+        
+        // Restore contacts search results if they were previously fetched and saved
+        if (job['Recruiter URL'] || job['Hiring Manager URL']) {
+          setContactsResult({
+            recruiterUrl: job['Recruiter URL'] || '',
+            managerUrl: job['Hiring Manager URL'] || '',
+            emailFormat: '' // Email format is not saved in DB, so leave blank to fallback to 'Not found'
+          });
+        } else {
+          setContactsResult(null);
+        }
+
         setActiveTab('evaluator');
         window.scrollTo(0, 0);
       } catch (e) {
@@ -321,6 +382,15 @@ export default function Dashboard() {
     const s = (j.Status || '').toLowerCase();
     return s.includes('applied');
   }).length;
+
+  const filteredJobs = jobs.filter(job => {
+    const searchStr = trackerSearch.toLowerCase();
+    return (
+      (job.Company?.toLowerCase() || '').includes(searchStr) ||
+      (job['Job Role']?.toLowerCase() || '').includes(searchStr) ||
+      (job.Status?.toLowerCase() || '').includes(searchStr)
+    );
+  });
 
   return (
     <div className={`app-layout ${isSidebarOpen ? '' : 'sidebar-closed'}`}>
@@ -425,10 +495,20 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <section className="table-container">
-              <div className="table-header">
-                <h2><CheckCircle2 size={20} style={{ color: '#6366f1' }} /> Application Pipeline</h2>
-              </div>
+              <section className="table-container">
+                <div className="table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h2><CheckCircle2 size={20} style={{ color: '#6366f1' }} /> Application Pipeline</h2>
+                  <div className="search-box" style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '0.5rem 1rem', width: '300px' }}>
+                    <Search size={18} color="#64748b" style={{ marginRight: '0.5rem' }} />
+                    <input 
+                      type="text" 
+                      placeholder="Search company, role, or status..." 
+                      value={trackerSearch} 
+                      onChange={(e) => setTrackerSearch(e.target.value)}
+                      style={{ border: 'none', backgroundColor: 'transparent', outline: 'none', width: '100%', fontSize: '0.875rem', color: '#0f172a' }}
+                    />
+                  </div>
+                </div>
               <div className="table-responsive">
                 <table>
                   <thead>
@@ -447,38 +527,44 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {jobs.length === 0 ? (
-                      <tr>
-                        <td colSpan="10">
-                          <div className="empty-state">
-                            <Briefcase size={48} className="empty-icon" />
-                            <p>No applications tracked yet. Start by evaluating a job!</p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      [...jobs].reverse().map((job, index) => (
-                        <tr key={index} onClick={() => handleRowClick(job)} style={{ cursor: job.Raw_Report_JSON ? 'pointer' : 'default' }}>
-                          <td>
-                            <div className="company-cell">
-                              <div className="company-logo-placeholder">
-                                {(job.Company || '?').charAt(0).toUpperCase()}
-                              </div>
-                              {job.Company || 'Unknown'}
+                      {jobs.length === 0 ? (
+                        <tr>
+                          <td colSpan="11">
+                            <div className="empty-state">
+                              <Briefcase size={48} className="empty-icon" />
+                              <p>No applications tracked yet. Start by evaluating a job!</p>
                             </div>
                           </td>
-                          <td>
-                            {job['Job Link'] ? (
-                              <a href={job['Job Link']} target="_blank" rel="noreferrer" className="role-link">
-                                {job['Job Role'] || 'Unknown Role'} <ExternalLink size={12} />
-                              </a>
-                            ) : (
-                              <span className="fw-500">{job['Job Role'] || 'Unknown Role'}</span>
-                            )}
+                        </tr>
+                      ) : filteredJobs.length === 0 ? (
+                        <tr>
+                          <td colSpan="11">
+                            <div className="empty-state">
+                              <Search size={48} className="empty-icon" style={{ color: '#cbd5e1', marginBottom: '1rem' }} />
+                              <p>No applications match your search query.</p>
+                            </div>
                           </td>
-                          <td className="text-muted">{job['Job ID'] || '-'}</td>
-                          <td>
-                            <select
+                        </tr>
+                      ) : (
+                        [...filteredJobs].reverse().map((job, index) => (
+                          <tr key={index} onClick={() => handleRowClick(job)} style={{ cursor: job.Raw_Report_JSON ? 'pointer' : 'default' }}>
+                            <td>
+                              <div className="company-cell">
+                                {job.Company || 'Unknown'}
+                              </div>
+                            </td>
+                            <td>
+                              {job['Job Link'] ? (
+                                <a href={job['Job Link']} target="_blank" rel="noreferrer" className="role-link" onClick={(e) => e.stopPropagation()}>
+                                  {job['Job Role'] || 'Unknown Role'} <ExternalLink size={12} />
+                                </a>
+                              ) : (
+                                <span className="fw-500">{job['Job Role'] || 'Unknown Role'}</span>
+                              )}
+                            </td>
+                            <td className="text-muted">{job['Job ID'] || '-'}</td>
+                            <td>
+                              <select
                               value={job.Status || 'Evaluated'}
                               onChange={(e) => handleStatusChange(e, job)}
                               onClick={(e) => e.stopPropagation()}
@@ -655,16 +741,14 @@ export default function Dashboard() {
                 <div className="recruiter-box">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h4 style={{ margin: 0 }}>Identified Contacts</h4>
-                    {!contactsResult && (
-                      <button
-                        onClick={handleFindContacts}
-                        className="eval-submit-btn"
-                        disabled={isFindingContacts}
-                        style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-                      >
-                        {isFindingContacts ? <><Loader2 size={16} className="spinner" /> Finding...</> : <><Search size={16} /> Find Contacts</>}
-                      </button>
-                    )}
+                    <button
+                      onClick={handleFindContacts}
+                      className="eval-submit-btn"
+                      disabled={isFindingContacts}
+                      style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                    >
+                      {isFindingContacts ? <><Loader2 size={16} className="spinner" /> Finding...</> : <><Search size={16} /> Find Contacts</>}
+                    </button>
                   </div>
 
                   {contactsResult && (
@@ -699,17 +783,13 @@ export default function Dashboard() {
                           onChange={(e) => setChosenManagerUrl(e.target.value)}
                         />
                       </div>
-                      <div className="contact-row mt-4" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px dashed #cbd5e1' }}>
-                        <p style={{ margin: 0 }}><strong>Predicted Email Format:</strong> <span style={{ fontFamily: 'monospace', color: '#475569', backgroundColor: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', marginLeft: '0.5rem' }}>{contactsResult.emailFormat || 'Not found'}</span></p>
-                        <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem', marginBottom: 0 }}>Use this format when generating cold emails if you find the recruiter's name.</p>
-                      </div>
                     </>
                   )}
                 </div>
 
-                <div className="emails-section">
+                <div className="emails-section recruiter-box" style={{ marginTop: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h4 style={{ margin: 0 }}>{evaluationResult.report.recruiter_email || evaluationResult.report.manager_email ? 'Generated Cold Emails' : ''}</h4>
+                    <h4 style={{ margin: 0 }}>Cold Emails</h4>
                     <button
                       onClick={handleGenerateEmails}
                       className="eval-submit-btn"
@@ -720,31 +800,62 @@ export default function Dashboard() {
                     </button>
                   </div>
 
+                  {contactsResult?.emailFormat && (
+                    <div className="contact-row mb-4" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px dashed #cbd5e1' }}>
+                      <p style={{ margin: 0 }}><strong>Predicted Email Format:</strong> <span style={{ fontFamily: 'monospace', color: '#475569', backgroundColor: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', marginLeft: '0.5rem' }}>{contactsResult.emailFormat}</span></p>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem', marginBottom: 0 }}>Use this format when finding the recruiter's actual email address for the cold email below.</p>
+                    </div>
+                  )}
+
                   {(evaluationResult.report.recruiter_email || evaluationResult.report.manager_email) && (
                     <div className="report-grid">
                       {evaluationResult.report.recruiter_email && (
                         <div className="email-preview-box">
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <h5 style={{ margin: 0 }}>Recruiter Email</h5>
-                            <button onClick={() => copyRichText('recruiter-email-content')} className="copy-btn">Copy</button>
+                          <h5 style={{ margin: '0 0 1rem 0', fontSize: '1.15rem', color: '#0f172a' }}>Recruiter Email</h5>
+                          
+                          {/* Subject Line */}
+                          <div style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.25rem', border: '1px solid #cbd5e1' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Subject</span>
+                              <button onClick={() => navigator.clipboard.writeText(parseEmail(evaluationResult.report.recruiter_email).subject)} className="copy-btn">Copy</button>
+                            </div>
+                            <div style={{ fontWeight: '500', color: '#0f172a' }}>{parseEmail(evaluationResult.report.recruiter_email).subject}</div>
                           </div>
-                          <div id="recruiter-email-content" className="email-markdown">
-                            <ReactMarkdown components={{ p: ({ node, ...props }) => <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5em' }} {...props} /> }}>
-                              {evaluationResult.report.recruiter_email}
-                            </ReactMarkdown>
+
+                          {/* Body */}
+                          <div style={{ padding: '0.75rem', backgroundColor: '#ffffff', borderRadius: '0.25rem', border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Body</span>
+                              <button onClick={() => copyRichText('recruiter-email-body')} className="copy-btn">Copy</button>
+                            </div>
+                            <div id="recruiter-email-body" className="email-markdown" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: '1.6', fontSize: '0.95rem', color: '#1e293b' }}>
+                              {parseEmail(evaluationResult.report.recruiter_email).body}
+                            </div>
                           </div>
                         </div>
                       )}
                       {evaluationResult.report.manager_email && (
                         <div className="email-preview-box">
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <h5 style={{ margin: 0 }}>Hiring Manager Email</h5>
-                            <button onClick={() => copyRichText('manager-email-content')} className="copy-btn">Copy</button>
+                          <h5 style={{ margin: '0 0 1rem 0', fontSize: '1.15rem', color: '#0f172a' }}>Hiring Manager Email</h5>
+                          
+                          {/* Subject Line */}
+                          <div style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.25rem', border: '1px solid #cbd5e1' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Subject</span>
+                              <button onClick={() => navigator.clipboard.writeText(parseEmail(evaluationResult.report.manager_email).subject)} className="copy-btn">Copy</button>
+                            </div>
+                            <div style={{ fontWeight: '500', color: '#0f172a' }}>{parseEmail(evaluationResult.report.manager_email).subject}</div>
                           </div>
-                          <div id="manager-email-content" className="email-markdown">
-                            <ReactMarkdown components={{ p: ({ node, ...props }) => <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5em' }} {...props} /> }}>
-                              {evaluationResult.report.manager_email}
-                            </ReactMarkdown>
+
+                          {/* Body */}
+                          <div style={{ padding: '0.75rem', backgroundColor: '#ffffff', borderRadius: '0.25rem', border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Body</span>
+                              <button onClick={() => copyRichText('manager-email-body')} className="copy-btn">Copy</button>
+                            </div>
+                            <div id="manager-email-body" className="email-markdown" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: '1.6', fontSize: '0.95rem', color: '#1e293b' }}>
+                              {parseEmail(evaluationResult.report.manager_email).body}
+                            </div>
                           </div>
                         </div>
                       )}

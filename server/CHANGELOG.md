@@ -1,5 +1,16 @@
 # Server Architecture & Changelog
 
+## v2.1.0 - UI Polishing & Smart Job Caching (2026-06-23)
+
+### ✨ New Features & Fixes
+- **Smart Data Caching**: Raw scraped job descriptions are now natively saved into a new `Job Description` column in `applications.xlsx`. This allows the Cold Email Generator to instantly reuse the cached description instead of endlessly re-scraping job boards that frequently take down posts or throttle connections.
+- **Improved AI Parsing**: Shifted AI prompts from JSON to `<RECRUITER_EMAIL>` and `<MANAGER_EMAIL>` XML tags to completely eliminate strict JSON formatting crashes.
+- **Enhanced Dashboard Formatting**: The frontend "Cold Email" generator now perfectly balances raw text spacing (line breaks) without breaking Markdown links. Split the generated emails into separate Subject and Body sections with dedicated "Copy" buttons.
+- **UI Consistency**: Standardized UI headers and box styling across "Identified Contacts" and "Cold Emails" sections. Increased font sizes for readability.
+- **Log Fixes**: Removed misleading "generating linkedin search urls" server logs that showed up when regenerating emails.
+
+---
+
 ## Summary of Implementation
 
 You now have a **fully functional Express.js API server** with AI-powered job posting evaluation capabilities.

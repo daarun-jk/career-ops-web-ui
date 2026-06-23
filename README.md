@@ -67,9 +67,13 @@ cp config/profile.example.yml config/profile.yml
 
 **3. Your Resume:** 
 Create a file named `cv.md` in the root of the project. Paste your resume in Markdown format here. The AI uses this to evaluate your fit against job descriptions.
+*Pro-Tip: You can create role-specific resumes! If you select a specific role in the Dashboard (e.g., Cloud / DevOps), the server will look for `cv-cloud-devops.md`. If it doesn't exist, it safely falls back to `cv.md`.*
 
 **4. Email Templates (Optional):** 
-Add your standard email templates to `config/emails.json`.
+Add your standard email templates to `config/emails.json`. This file is used to generate personalized cold outreach emails.
+
+**5. PDF Templates (Optional):**
+The HTML templates used to generate your PDFs are located in the `templates/` folder (`cv-template.html` and `cover-letter-template.html`). You can safely edit the CSS in these files to customize the design of your generated PDFs.
 
 ### 4. Running the Application
 
