@@ -67,3 +67,22 @@ package-lock.json
 
 # Planning (local scratchpad)
 plan/
+
+# Personal Resumes & Email Templates
+cv-*.md
+config/emails.json
+resumes/
+
+# Job Application Databases
+server/applications.xlsx
+server/applications-backup.xlsx
+
+# Output files
+server/output/*
+!server/output/.gitkeep
+
+# Secrets (all .env files)
+.env.*
+
+!.env.example
+
