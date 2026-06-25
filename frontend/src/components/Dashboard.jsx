@@ -43,7 +43,7 @@ export default function Dashboard() {
   const [trackerSearch, setTrackerSearch] = useState('');
   const [error, setError] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [selectedModel, setSelectedModel] = useState('gemini-flash-latest');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-oss-120b');
   // Evaluator State
   const [aiUrl, setAiUrl] = useState('');
   const [aiText, setAiText] = useState('');
@@ -161,6 +161,25 @@ export default function Dashboard() {
     }
   };
 
+  const clearEvaluatorState = () => {
+    setAiUrl('');
+    setAiText('');
+    setEvaluationResult(null);
+    setContactsResult(null);
+    setChatInput('');
+    setChatResult('');
+    setChosenRecruiterUrl('');
+    setChosenManagerUrl('');
+  };
+
+  // Navigate via navbar — clears evaluator state when leaving the Evaluator tab
+  const handleNavChange = (tab) => {
+    if (activeTab === 'evaluator' && tab !== 'evaluator') {
+      clearEvaluatorState();
+    }
+    setActiveTab(tab);
+  };
+
   const handleApplyToTracker = async () => {
     if (!evaluationResult || !evaluationResult.data) return;
     try {
@@ -179,8 +198,7 @@ export default function Dashboard() {
       if (chosenManagerUrl) jobData['Chosen Manager URL'] = chosenManagerUrl;
 
       await addJob(jobData);
-      setEvaluationResult(null);
-      setContactsResult(null);
+      clearEvaluatorState();
       await loadJobs();
       setActiveTab('tracker');
     } catch (err) {
@@ -378,10 +396,12 @@ export default function Dashboard() {
     }
   };
 
-  const appliedApplications = jobs.filter(j => {
-    const s = (j.Status || '').toLowerCase();
-    return s.includes('applied');
-  }).length;
+  const statTotal      = jobs.length;
+  const statEvaluated  = jobs.filter(j => (j.Status || '').toLowerCase() === 'evaluated').length;
+  const statApplied    = jobs.filter(j => (j.Status || '').toLowerCase() === 'applied').length;
+  const statOA         = jobs.filter(j => (j.Status || '').toLowerCase() === 'got oa').length;
+  const statInterviewing = jobs.filter(j => (j.Status || '').toLowerCase() === 'interviewing').length;
+  const statRejected   = jobs.filter(j => (j.Status || '').toLowerCase() === 'rejected').length;
 
   const filteredJobs = jobs.filter(job => {
     const searchStr = trackerSearch.toLowerCase();
@@ -403,25 +423,25 @@ export default function Dashboard() {
         <nav className="sidebar-nav">
           <button
             className={`nav-btn ${activeTab === 'tracker' ? 'active' : ''}`}
-            onClick={() => setActiveTab('tracker')}
+            onClick={() => handleNavChange('tracker')}
           >
             <LayoutDashboard size={18} /> Application Tracker
           </button>
           <button
             className={`nav-btn ${activeTab === 'evaluator' ? 'active' : ''}`}
-            onClick={() => setActiveTab('evaluator')}
+            onClick={() => handleNavChange('evaluator')}
           >
             <Target size={18} /> Job Evaluator
           </button>
           <button
             className={`nav-btn ${activeTab === 'outreach' ? 'active' : ''}`}
-            onClick={() => setActiveTab('outreach')}
+            onClick={() => handleNavChange('outreach')}
           >
             <MessageSquare size={18} /> Outreach & Research
           </button>
           <button
             className={`nav-btn ${activeTab === 'documents' ? 'active' : ''}`}
-            onClick={() => setActiveTab('documents')}
+            onClick={() => handleNavChange('documents')}
           >
             <FileText size={18} /> CV & Cover Letters
           </button>
@@ -471,26 +491,33 @@ export default function Dashboard() {
               <p>Monitor your active applications and overall pipeline health.</p>
             </div>
 
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon-wrapper blue"><Briefcase size={24} /></div>
-                <div className="stat-content">
-                  <h3>Total Tracked</h3>
-                  <p>{jobs.length}</p>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon-wrapper green"><Clock size={24} /></div>
+            <div className="stats-grid stats-grid--4">
+              <div className="stat-card stat-card--applied">
+                <div className="stat-icon-wrapper amber"><Send size={18} /></div>
                 <div className="stat-content">
                   <h3>Applied</h3>
-                  <p>{appliedApplications}</p>
+                  <p className="stat-num">{statApplied}</p>
                 </div>
               </div>
-              <div className="stat-card">
-                <div className="stat-icon-wrapper purple"><Building2 size={24} /></div>
+              <div className="stat-card stat-card--oa">
+                <div className="stat-icon-wrapper violet"><FileText size={18} /></div>
                 <div className="stat-content">
-                  <h3>Companies</h3>
-                  <p>{new Set(jobs.map(j => j.Company).filter(Boolean)).size}</p>
+                  <h3>OA</h3>
+                  <p className="stat-num">{statOA}</p>
+                </div>
+              </div>
+              <div className="stat-card stat-card--interviewing">
+                <div className="stat-icon-wrapper green"><MessageSquare size={18} /></div>
+                <div className="stat-content">
+                  <h3>Interviewing</h3>
+                  <p className="stat-num">{statInterviewing}</p>
+                </div>
+              </div>
+              <div className="stat-card stat-card--rejected">
+                <div className="stat-icon-wrapper red"><AlertCircle size={18} /></div>
+                <div className="stat-content">
+                  <h3>Rejected</h3>
+                  <p className="stat-num">{statRejected}</p>
                 </div>
               </div>
             </div>
@@ -680,8 +707,10 @@ export default function Dashboard() {
               <div className="evaluation-report fade-in">
                 <div className="report-header">
                   <div>
-                    <h2 className="report-title">{evaluationResult.data.Role}</h2>
-                    <h3 className="report-company">{evaluationResult.data.Company}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+                      <h2 className="report-company" style={{ margin: 0, fontWeight: 'bold', fontSize: '1.5rem', color: '#0f172a' }}>{evaluationResult.data.Company}</h2>
+                    </div>
+                    <h3 className="report-title" style={{ margin: 0, fontWeight: 'bold', color: '#475569', fontSize: '1.1rem', marginTop: '0.25rem' }}>{evaluationResult.data['Job Role'] || evaluationResult.data.Role}</h3>
                   </div>
                   <div className="report-score">
                     <span className="score-number">{evaluationResult.report.match_score}</span>
@@ -695,16 +724,51 @@ export default function Dashboard() {
                   <div className="report-box pros">
                     <h4><CheckCircle2 size={16} /> Key Pros</h4>
                     <ul>
-                      {evaluationResult.report.pros.map((p, i) => <li key={i}>{p}</li>)}
+                      {evaluationResult.report.pros?.map((p, i) => <li key={i}>{p}</li>)}
                     </ul>
                   </div>
                   <div className="report-box cons">
                     <h4><AlertCircle size={16} /> Potential Cons</h4>
                     <ul>
-                      {evaluationResult.report.cons.map((c, i) => <li key={i}>{c}</li>)}
+                      {evaluationResult.report.cons?.map((c, i) => <li key={i}>{c}</li>)}
                     </ul>
                   </div>
                 </div>
+
+                {evaluationResult.report.gaps && evaluationResult.report.gaps.length > 0 && (
+                  <div className="report-section" style={{ marginTop: '2.5rem' }}>
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                      <AlertCircle size={18} color="#dc2626" /> Gap Analysis & Mitigation
+                    </h4>
+                    <div className="gaps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.75rem' }}>
+                      {evaluationResult.report.gaps.map((gap, i) => (
+                        <div key={i} style={{ backgroundColor: gap.is_blocker ? '#fef2f2' : '#fffbeb', padding: '1.25rem', borderRadius: '0.5rem', border: gap.is_blocker ? '1px solid #fecaca' : '1px solid #fde68a' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                            {gap.is_blocker ? <AlertCircle size={18} color="#dc2626" style={{ marginTop: '0.1rem', flexShrink: 0 }} /> : <AlertCircle size={18} color="#d97706" style={{ marginTop: '0.1rem', flexShrink: 0 }} />}
+                            <strong style={{ color: gap.is_blocker ? '#b91c1c' : '#b45309', fontSize: '1rem', lineHeight: '1.2' }}>{gap.gap}</strong>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.9rem', color: gap.is_blocker ? '#7f1d1d' : '#78350f' }}><strong>Mitigation:</strong> {gap.mitigation}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {evaluationResult.report.resume_changes && evaluationResult.report.resume_changes.length > 0 && (
+                  <div className="report-section" style={{ marginTop: '2.5rem', marginBottom: '2.5rem' }}>
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                      <FileText size={18} /> Key Resume Changes (To Maximize Match)
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {evaluationResult.report.resume_changes.map((change, i) => (
+                        <div key={i} style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                          <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#1e293b', fontSize: '1rem' }}>{change.action}</strong>
+                          <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569', lineHeight: '1.4' }}><strong>Why:</strong> {change.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="chat-box" style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
                   <h4 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><MessageSquare size={18} /> Application Q&A Chat</h4>

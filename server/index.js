@@ -55,9 +55,9 @@ async function generateAIContent(prompt, requestModel, temperature = 0.3, maxTok
             if (isGroq) {
                 if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY missing from environment');
                 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-                // Groq free tier has strict TPM limits (e.g. 8000 TPM). 
-                // We clamp max_tokens to prevent it from reserving too many tokens and failing instantly.
-                const safeMaxTokens = Math.min(maxTokens, 1500);
+                // Groq free tier has an 8000 TPM limit. "Requested" = prompt tokens + max_tokens.
+                // We clamp max_tokens to 3000 (up from 1500) so deep eval can complete, but without hitting 8000 TPM.
+                const safeMaxTokens = Math.min(maxTokens, 3000);
                 const completion = await groq.chat.completions.create({
                     messages: [{ role: 'user', content: finalPrompt }],
                     model: modelName,
@@ -169,11 +169,12 @@ async function extractJobMetadata(scrapedText, resumeProfile = 'sde', requestMod
         throw new Error('GEMINI_API_KEY not configured in environment');
     }
 
-    // Load CV and Profile from parent directory
+    // Load CV, Profile, and other context from parent directory
     const ROOT = path.join(__dirname, '..');
     let cvContent = '';
     let profileContent = '';
-    let emailsContent = '';
+    let userNarrative = '';
+    let proofPoints = '';
     
     const profileMap = {
         'sde': 'cv-sde.md',
@@ -187,18 +188,35 @@ async function extractJobMetadata(scrapedText, resumeProfile = 'sde', requestMod
     try {
         cvContent = fs.readFileSync(path.join(ROOT, cvFile), 'utf-8');
         profileContent = fs.readFileSync(path.join(ROOT, 'config', 'profile.yml'), 'utf-8');
-        emailsContent = fs.readFileSync(path.join(ROOT, 'config', 'emails.json'), 'utf-8');
     } catch (e) {
-        console.warn('Warning: Could not read CV, profile, or emails. Match score may be degraded.', e.message);
+        console.warn('Warning: Could not read CV or profile.', e.message);
+    }
+
+    try {
+        if (fs.existsSync(path.join(ROOT, 'modes', '_profile.md'))) {
+            userNarrative = fs.readFileSync(path.join(ROOT, 'modes', '_profile.md'), 'utf-8');
+        }
+        if (fs.existsSync(path.join(ROOT, 'article-digest.md'))) {
+            proofPoints = fs.readFileSync(path.join(ROOT, 'article-digest.md'), 'utf-8');
+        }
+    } catch (e) {
+        console.warn('Warning: Could not read _profile.md or article-digest.md.', e.message);
     }
 
     const prompt = `You are an expert career assistant evaluating a job posting against a candidate's CV and profile.
+Do a deep evaluation mapping JD requirements to the candidate's experience.
 
 CANDIDATE CV:
 ${cvContent || 'Not provided'}
 
-CANDIDATE PROFILE:
+CANDIDATE PROFILE (Config):
 ${profileContent || 'Not provided'}
+
+CANDIDATE NARRATIVE & STRATEGY:
+${userNarrative || 'Not provided'}
+
+PROOF POINTS & METRICS:
+${proofPoints || 'Not provided'}
 
 JOB POSTING:
 ${scrapedText.slice(0, 8000)}
@@ -210,10 +228,24 @@ Return a JSON object with EXACTLY these keys (no markdown, no code blocks):
   "company": "company name or 'Unknown'",
   "role": "job title or 'Unknown'",
   "req_id": "job ID/requisition ID if found, otherwise empty string",
+  "archetype": "Detected role archetype (e.g. LLMOps, Agentic, PM, SA, FDE, Transformation, or Custom)",
   "match_score": "Evaluate the match out of 5 based on the CV. Return a number between 1.0 and 5.0 (e.g. 4.2)",
   "evaluation_summary": "A brief 2-sentence summary of why this is or isn't a good fit",
   "pros": ["array of 3 positive aspects of the role for this candidate"],
-  "cons": ["array of 3 potential drawbacks or challenges for this candidate"]
+  "cons": ["array of 3 potential drawbacks or challenges for this candidate"],
+  "key_requirements": [
+    { "requirement": "JD requirement 1", "cv_evidence": "Exact evidence from CV/proof points" },
+    { "requirement": "JD requirement 2", "cv_evidence": "Exact evidence from CV/proof points" }
+  ],
+  "gaps": [
+    { "gap": "Missing skill/experience", "is_blocker": boolean, "mitigation": "How to mitigate this in a cover letter or interview" }
+  ],
+  "interview_angles": [
+    { "concept": "Key theme from JD", "star_story_prompt": "Prompt for a STAR story the candidate should prepare based on their CV" }
+  ],
+  "resume_changes": [
+    { "action": "Specific change to make to the CV (e.g. 'Reword the bullet about X to emphasize Y')", "reason": "Why this maximizes match with the JD" }
+  ]
 }
 
 Return ONLY the JSON object, no other text.`;
@@ -232,10 +264,15 @@ Return ONLY the JSON object, no other text.`;
             company: metadata.company || 'Unknown',
             role: metadata.role || 'Unknown',
             req_id: metadata.req_id || '',
+            archetype: metadata.archetype || 'General',
             match_score: metadata.match_score || 0,
             evaluation_summary: metadata.evaluation_summary || '',
             pros: metadata.pros || [],
-            cons: metadata.cons || []
+            cons: metadata.cons || [],
+            key_requirements: metadata.key_requirements || [],
+            gaps: metadata.gaps || [],
+            interview_angles: metadata.interview_angles || [],
+            resume_changes: metadata.resume_changes || []
         };
     } catch (error) {
         console.error('Gemini parsing error:', error.message);
@@ -652,8 +689,13 @@ app.post('/api/jobs/evaluate', async (req, res) => {
         const evaluationReport = {
             match_score: jobMetadata.match_score,
             evaluation_summary: jobMetadata.evaluation_summary,
+            archetype: jobMetadata.archetype || '',
             pros: jobMetadata.pros || [],
             cons: jobMetadata.cons || [],
+            key_requirements: jobMetadata.key_requirements || [],
+            gaps: jobMetadata.gaps || [],
+            interview_angles: jobMetadata.interview_angles || [],
+            resume_changes: jobMetadata.resume_changes || [],
             recruiter_email: jobMetadata.recruiter_email || '',
             manager_email: jobMetadata.manager_email || ''
         };
