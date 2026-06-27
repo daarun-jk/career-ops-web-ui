@@ -8,6 +8,9 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
+const { google } = require('googleapis');
+const MailComposer = require('nodemailer/lib/mail-composer');
+const { marked } = require('marked');
 
 // Load environment variables
 const dotenv = require('dotenv');
@@ -19,6 +22,29 @@ const PORT = process.env.PORT || 3000;
 const FILE_PATH = path.join(__dirname, 'applications.xlsx');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+
+// Gmail API Setup
+const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
+const GMAIL_REDIRECT_URI = process.env.GMAIL_REDIRECT_URI || `http://localhost:${PORT}/api/gmail/oauth2callback`;
+
+const oauth2Client = new google.auth.OAuth2(
+  GMAIL_CLIENT_ID,
+  GMAIL_CLIENT_SECRET,
+  GMAIL_REDIRECT_URI
+);
+
+const TOKEN_PATH = path.join(__dirname, 'config', 'gmail_token.json');
+
+if (fs.existsSync(TOKEN_PATH)) {
+    try {
+        const token = fs.readFileSync(TOKEN_PATH);
+        oauth2Client.setCredentials(JSON.parse(token));
+        console.log('✅ Gmail API: Authenticated using saved token');
+    } catch (e) {
+        console.log('⚠️ Gmail API: Failed to load saved token');
+    }
+}
 
 // Middleware
 app.use(cors({
@@ -251,7 +277,7 @@ Return a JSON object with EXACTLY these keys (no markdown, no code blocks):
 Return ONLY the JSON object, no other text.`;
 
     try {
-        const responseText = await generateAIContent(prompt, requestModel, 0.3, 8192);
+        const responseText = await generateAIContent(prompt, requestModel, 0.0, 8192);
 
         // Clean up response (remove markdown code blocks if present)
         const jsonStr = responseText
@@ -435,6 +461,90 @@ Return ONLY the JSON object, no other text.`;
         return { recruiter_name: '', hiring_manager: '' };
     }
 }
+
+// ═════════════════════════════════════════════════════════════
+// GMAIL API ENDPOINTS
+// ═════════════════════════════════════════════════════════════
+
+app.get('/api/gmail/status', (req, res) => {
+    const isConnected = fs.existsSync(TOKEN_PATH) && oauth2Client.credentials && oauth2Client.credentials.access_token;
+    res.json({ connected: !!isConnected });
+});
+
+app.get('/api/gmail/auth', (req, res) => {
+    if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
+        return res.status(500).json({ error: 'GMAIL_CLIENT_ID or GMAIL_CLIENT_SECRET not set in .env' });
+    }
+    const authUrl = oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: ['https://www.googleapis.com/auth/gmail.compose'],
+        prompt: 'consent'
+    });
+    res.redirect(authUrl);
+});
+
+app.get('/api/gmail/oauth2callback', async (req, res) => {
+    const code = req.query.code;
+    if (!code) {
+        return res.status(400).send('No code provided');
+    }
+    try {
+        const { tokens } = await oauth2Client.getToken(code);
+        oauth2Client.setCredentials(tokens);
+        if (!fs.existsSync(path.join(__dirname, 'config'))) {
+            fs.mkdirSync(path.join(__dirname, 'config'));
+        }
+        fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+        res.send('<html><body><h2>Authentication successful!</h2><p>You can close this window and return to the app.</p><script>window.close();</script></body></html>');
+    } catch (error) {
+        console.error('Error retrieving access token', error);
+        res.status(500).send('Error retrieving access token');
+    }
+});
+
+app.post('/api/gmail/draft', async (req, res) => {
+    try {
+        const { to, subject, body } = req.body;
+        if (!oauth2Client.credentials || !oauth2Client.credentials.access_token) {
+            return res.status(401).json({ success: false, error: 'Not authenticated with Gmail' });
+        }
+        
+        const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+        
+        // Parse markdown body to HTML to make links clickable, preserving single line breaks
+        const htmlBody = marked.parse(body || '', { breaks: true });
+
+        // Use nodemailer to easily build RFC 2822 message
+        const mail = new MailComposer({
+            to: to || 'recruiter@example.com',
+            subject: subject,
+            text: body,
+            html: htmlBody,
+            textEncoding: 'base64'
+        });
+        
+        const message = await mail.compile().build();
+        const encodedMessage = Buffer.from(message)
+            .toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+            
+        const draft = await gmail.users.drafts.create({
+            userId: 'me',
+            requestBody: {
+                message: {
+                    raw: encodedMessage
+                }
+            }
+        });
+        
+        res.json({ success: true, draftId: draft.data.id });
+    } catch (error) {
+        console.error('Draft creation error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create draft', details: error.message });
+    }
+});
 
 // GET /api/jobs - Read Excel and return rows as JSON
 app.get('/api/jobs', async (req, res) => {

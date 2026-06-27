@@ -1,5 +1,14 @@
 # Server Architecture & Changelog
 
+## v2.2.0 - Gmail Draft API Integration (2026-06-27)
+
+### ✨ New Features & Fixes
+- **True Background Drafts**: Replaced unreliable frontend Gmail deep-links (`view=cm`) with a robust backend integration using the official `googleapis` package. Drafts are now created silently via the Gmail API.
+- **Automated Recipient Pre-filling**: When clicking "Save to Drafts", the app now automatically passes the AI-predicted email format (e.g., `first.last@company.com`) directly into the "To:" field of the Gmail draft.
+- **Rich Text Rendering**: Integrated `marked` markdown parser to properly render `[Link Text](url)` markdown into clickable HTML hyperlinks in the final drafted email, while preserving single line breaks (like in email signatures).
+- **OAuth Persistence**: Added full OAuth 2.0 flow with persistent token storage (`server/config/gmail_token.json`) to prevent users from needing to authenticate every time.
+
+---
 ## v2.1.0 - UI Polishing & Smart Job Caching (2026-06-23)
 
 ### ✨ New Features & Fixes

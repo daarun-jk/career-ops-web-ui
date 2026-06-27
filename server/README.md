@@ -47,6 +47,8 @@ cp .env.example .env
 Edit `.env` and add:
 - `GEMINI_API_KEY` - Required for `/api/jobs/evaluate` endpoint
 - `PORT` - Optional (default: 3000)
+- `GMAIL_CLIENT_ID` - Required for Gmail draft integration
+- `GMAIL_CLIENT_SECRET` - Required for Gmail draft integration
 
 ### 2. Get Gemini API Key (for AI job evaluation)
 
@@ -56,6 +58,23 @@ Edit `.env` and add:
 4. Add to `.env`:
    ```
    GEMINI_API_KEY=your_key_here
+   ```
+
+### 3. Get Gmail API Credentials (for background drafts)
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a **New Project**.
+3. Search for **"Gmail API"** and click **Enable**.
+4. Go to **APIs & Services > OAuth consent screen**. Choose **External** and click **Create**.
+5. Fill in App Name and Email. Skip Scopes. 
+6. In **Test users**, add your exact Gmail address. (Crucial: otherwise you'll get an Access Denied error).
+7. Go to **APIs & Services > Credentials** -> **+ CREATE CREDENTIALS** -> **OAuth client ID**.
+8. Application type: **Web application**.
+9. Authorized redirect URIs: `http://localhost:3000/api/gmail/oauth2callback`
+10. Click **Create**, then copy the keys into `.env`:
+   ```
+   GMAIL_CLIENT_ID=your_client_id
+   GMAIL_CLIENT_SECRET=your_client_secret
    ```
 
 **Free Tier Details:**

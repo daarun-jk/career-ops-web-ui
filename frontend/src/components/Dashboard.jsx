@@ -44,6 +44,17 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState('openai/gpt-oss-120b');
+  
+  const [isGmailConnected, setIsGmailConnected] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(false);
+  
+  useEffect(() => {
+    fetch('http://localhost:3000/api/gmail/status')
+      .then(res => res.json())
+      .then(data => setIsGmailConnected(data.connected))
+      .catch(err => console.error('Error fetching Gmail status:', err));
+  }, []);
+
   // Evaluator State
   const [aiUrl, setAiUrl] = useState('');
   const [aiText, setAiText] = useState('');
@@ -126,6 +137,40 @@ export default function Dashboard() {
 
     const body = lines.slice(bodyStartIndex).join('\n').trim();
     return { subject, body };
+  };
+
+  const saveGmailDraft = async (emailText, toAddress = '') => {
+    if (!emailText) return;
+    
+    if (!isGmailConnected) {
+      window.open('http://localhost:3000/api/gmail/auth', '_blank');
+      // Set a small timeout to let the user auth, then we check status again. 
+      // User can click button again after auth.
+      return;
+    }
+    
+    setIsDrafting(true);
+    try {
+      const { subject, body } = parseEmail(emailText);
+      const res = await fetch('http://localhost:3000/api/gmail/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, body, to: toAddress })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Draft saved successfully to Gmail in the background!');
+      } else {
+        alert('Failed to save draft: ' + data.error);
+        if (data.error === 'Not authenticated with Gmail') {
+            setIsGmailConnected(false);
+        }
+      }
+    } catch (err) {
+      console.error('Draft error:', err);
+      alert('Error saving draft');
+    }
+    setIsDrafting(false);
   };
 
   const handleAIEvaluate = async (e) => {
@@ -309,6 +354,27 @@ export default function Dashboard() {
       await loadJobs();
     } catch (err) {
       setError('Failed to update status: ' + err.message);
+      await loadJobs();
+    }
+  };
+
+  const handleDateChange = async (e, job) => {
+    e.stopPropagation();
+    const newDate = e.target.value;
+
+    // Optimistic update
+    const updatedJobs = jobs.map(j =>
+      j['Job Link'] === job['Job Link'] && j['Resume Profile'] === job['Resume Profile']
+        ? { ...j, 'Date Applied': newDate }
+        : j
+    );
+    setJobs(updatedJobs);
+
+    try {
+      await addJob({ ...job, 'Date Applied': newDate });
+      await loadJobs();
+    } catch (err) {
+      setError('Failed to update date: ' + err.message);
       await loadJobs();
     }
   };
@@ -612,7 +678,33 @@ export default function Dashboard() {
                           <td>
                             {job['Resume Profile'] ? <span className="status-badge" style={{ backgroundColor: '#f1f5f9', color: '#64748b' }}>{job['Resume Profile'].toUpperCase()}</span> : '-'}
                           </td>
-                          <td className="text-muted">{job['Date Applied'] || '-'}</td>
+                          <td className="text-muted">
+                            <input 
+                              type="date"
+                              value={job['Date Applied'] || ''}
+                              onChange={(e) => handleDateChange(e, job)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="date-input"
+                              style={{ 
+                                border: '1px solid transparent', 
+                                backgroundColor: 'transparent', 
+                                color: 'inherit',
+                                outline: 'none',
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                padding: '0.25rem',
+                                borderRadius: '0.25rem'
+                              }}
+                              onFocus={(e) => {
+                                e.target.style.border = '1px solid #cbd5e1';
+                                e.target.style.backgroundColor = 'white';
+                              }}
+                              onBlur={(e) => {
+                                e.target.style.border = '1px solid transparent';
+                                e.target.style.backgroundColor = 'transparent';
+                              }}
+                            />
+                          </td>
                           <td>
                             {job['Recruiter URL'] && job['Recruiter URL'].startsWith('http') ? (
                               <a href={job['Recruiter URL']} target="_blank" rel="noreferrer" title="Recruiter Search"><ExternalLink size={16} /></a>
@@ -890,7 +982,12 @@ export default function Dashboard() {
                           <div style={{ padding: '0.75rem', backgroundColor: '#ffffff', borderRadius: '0.25rem', border: '1px solid #e2e8f0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                               <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Body</span>
-                              <button onClick={() => copyRichText('recruiter-email-body')} className="copy-btn">Copy</button>
+                              <div>
+                                <button onClick={() => copyRichText('recruiter-email-body')} className="copy-btn">Copy</button>
+                                <button onClick={() => saveGmailDraft(evaluationResult.report.recruiter_email, contactsResult?.emailFormat)} disabled={isDrafting} className="copy-btn" style={{ marginLeft: '0.5rem', backgroundColor: '#ea4335', color: 'white', borderColor: '#ea4335' }}>
+                                  {isDrafting ? 'Saving...' : (isGmailConnected ? 'Save to Drafts' : 'Connect Gmail')}
+                                </button>
+                              </div>
                             </div>
                             <div id="recruiter-email-body" className="email-markdown" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: '1.6', fontSize: '0.95rem', color: '#1e293b' }}>
                               {parseEmail(evaluationResult.report.recruiter_email).body}
@@ -915,7 +1012,12 @@ export default function Dashboard() {
                           <div style={{ padding: '0.75rem', backgroundColor: '#ffffff', borderRadius: '0.25rem', border: '1px solid #e2e8f0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                               <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Body</span>
-                              <button onClick={() => copyRichText('manager-email-body')} className="copy-btn">Copy</button>
+                              <div>
+                                <button onClick={() => copyRichText('manager-email-body')} className="copy-btn">Copy</button>
+                                <button onClick={() => saveGmailDraft(evaluationResult.report.manager_email, contactsResult?.emailFormat)} disabled={isDrafting} className="copy-btn" style={{ marginLeft: '0.5rem', backgroundColor: '#ea4335', color: 'white', borderColor: '#ea4335' }}>
+                                  {isDrafting ? 'Saving...' : (isGmailConnected ? 'Save to Drafts' : 'Connect Gmail')}
+                                </button>
+                              </div>
                             </div>
                             <div id="manager-email-body" className="email-markdown" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: '1.6', fontSize: '0.95rem', color: '#1e293b' }}>
                               {parseEmail(evaluationResult.report.manager_email).body}

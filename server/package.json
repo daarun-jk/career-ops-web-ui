@@ -21,9 +21,12 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "google-it": "^1.6.4",
+    "googleapis": "^173.0.0",
     "googlethis": "^1.8.0",
     "groq-sdk": "^1.2.1",
+    "marked": "^18.0.5",
     "node-fetch": "^3.3.0",
+    "nodemailer": "^9.0.1",
     "playwright": "^1.48.0"
   },
   "devDependencies": {

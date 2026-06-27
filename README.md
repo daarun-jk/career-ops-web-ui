@@ -8,7 +8,7 @@ This repository started as a fork of the CLI-based `santifer/career-ops` but has
 
 - **AI Job Evaluator**: Paste any job URL and our AI (powered by Google Gemini and Groq) will analyze it against your personal `cv.md` to give you a match score, pros/cons, and tailored interview prep.
 - **Visual Application Tracker**: An interactive, spreadsheet-backed (Excel) table to manage all your applications. Update statuses directly from the dropdown (Evaluated, Applied, Got OA, Interviewing, Offered, Rejected).
-- **Automated Outreach**: Instantly generate highly personalized cold emails for recruiters and hiring managers based on your specific resume points.
+- **Automated Outreach & Gmail Integration**: Instantly generate highly personalized cold emails for recruiters and hiring managers based on your specific resume points. Save them directly into your Gmail Drafts folder silently in the background using Google's OAuth API.
 - **Cover Letter & ATS CV Generator**: Uses Playwright to generate beautifully formatted, tailored PDF cover letters and CVs that match the job description.
 
 ## Tech Stack
@@ -53,11 +53,15 @@ cd server
 cp .env.example .env
 ```
 Open `.env` and add your API Keys:
-```env
-GEMINI_API_KEY=your_gemini_key_here
-GROQ_API_KEY=your_groq_key_here
-```
-
+   ```env
+   GEMINI_API_KEY=your_gemini_key_here
+   GROQ_API_KEY=your_groq_key_here
+   
+   # For background Gmail drafts
+   GMAIL_CLIENT_ID=your_google_oauth_client_id
+   GMAIL_CLIENT_SECRET=your_google_oauth_client_secret
+   ```
+   *(For full instructions on how to set up the Gmail API credentials, see [server/GMAIL_INTEGRATION.md](./server/GMAIL_INTEGRATION.md))*
 **2. Your Profile:** 
 Copy the example profile template and edit it with your personal details:
 ```bash

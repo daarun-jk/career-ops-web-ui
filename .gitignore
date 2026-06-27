@@ -86,3 +86,4 @@ server/output/*
 
 !.env.example
 
+server/config/gmail_token.json
